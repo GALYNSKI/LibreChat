@@ -730,6 +730,24 @@ router.get('/download/:userId/:file_id', fileAccess, async (req, res) => {
 });
 
 /**
+ * Opt-in policy (`fileConfig.imageOnlyProviderUploads`): only images may be forwarded
+ * to the model provider.
+ *
+ * An upload with no `tool_resource` goes down the provider path and is passed to the
+ * upstream API verbatim. Some gateways in front of the model refuse a raw document —
+ * ours answers HTTP 400 for a PDF on both the OpenAI-compatible and the Anthropic path
+ * — leaving the user with a failed message and no explanation. Every non-image already
+ * has a working destination (`context`, `file_search`, `execute_code`).
+ *
+ * The client hides the option (`isProviderAttachType` in `client/src/utils/files.ts`);
+ * this is the half that also holds for a direct API call, a stale tab, or a client that
+ * simply omits `tool_resource`. Off by default, so upstream behavior is unchanged.
+ */
+const isImageOnlyProviderUploads = (req) =>
+  mergeFileConfig(req.config?.fileConfig)?.imageOnlyProviderUploads === true;
+const isProviderAttachableFile = (file) => file?.mimetype?.startsWith('image/') === true;
+
+/**
  * Role permission required to upload for a given tool resource. Mirrors
  * `toolAccessPermType` in `~/server/controllers/tools.js`, which gates the
  * matching tool call — the upload is the other half of the same door.
@@ -781,6 +799,22 @@ router.post('/', async (req, res) => {
         );
         return res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
       }
+    }
+
+    /** No tool resource means the provider path; when the policy is on, only images
+     * may take it. Assistants upload to their own storage and are not affected. */
+    if (
+      metadata.tool_resource == null &&
+      !isAssistantsEndpoint(metadata.endpoint) &&
+      !isProviderAttachableFile(req.file) &&
+      isImageOnlyProviderUploads(req)
+    ) {
+      logger.warn(
+        `[/files] Refused ${req.file?.mimetype} for the provider path (user ${req.user.id}): only images are forwarded to the model provider`,
+      );
+      return res.status(415).json({
+        message: 'Unsupported Media Type: only images can be sent to the model provider',
+      });
     }
 
     metadata.temp_file_id = metadata.file_id;

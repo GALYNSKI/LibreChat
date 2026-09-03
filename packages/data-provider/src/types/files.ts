@@ -54,6 +54,13 @@ export type FileConfig = {
   endpoints: {
     [key: string]: EndpointFileConfig;
   };
+  /**
+   * When true, only images may take the model-provider upload path. Every other
+   * file type must go to a tool resource ("as text", file search, code) instead.
+   * Off by default, preserving upstream behavior. See `isProviderAttachType`
+   * (client) and the `POST /api/files` guard (server).
+   */
+  imageOnlyProviderUploads?: boolean;
   skills?: {
     fileSizeLimit?: number;
   };

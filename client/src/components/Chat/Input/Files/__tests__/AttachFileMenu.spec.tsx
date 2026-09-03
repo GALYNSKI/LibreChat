@@ -21,6 +21,7 @@ jest.mock('~/hooks/Files/useSharePointFileHandling', () => ({
 
 jest.mock('~/data-provider', () => ({
   useGetStartupConfig: jest.fn(),
+  useGetFileConfig: jest.fn(),
 }));
 
 jest.mock('~/components/SharePoint', () => ({
@@ -94,6 +95,7 @@ const mockUseSharePointFileHandlingNoChatContext = jest.requireMock(
   '~/hooks/Files/useSharePointFileHandling',
 ).useSharePointFileHandlingNoChatContext;
 const mockUseGetStartupConfig = jest.requireMock('~/data-provider').useGetStartupConfig;
+const mockUseGetFileConfig = jest.requireMock('~/data-provider').useGetFileConfig;
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -124,6 +126,8 @@ function setupMocks(overrides: { provider?: string } = {}) {
   mockUseSharePointFileHandling.mockReturnValue(sharePointReturnValue);
   mockUseSharePointFileHandlingNoChatContext.mockReturnValue(sharePointReturnValue);
   mockUseGetStartupConfig.mockReturnValue({ data: { sharePointFilePickerEnabled: false } });
+  /** The menu's useGetFileConfig call applies a boolean selector; default: policy off. */
+  mockUseGetFileConfig.mockReturnValue({ data: false });
   mockUseUploadDestinationGates.mockReturnValue({
     fileSearchAllowed: false,
     codeAllowed: false,

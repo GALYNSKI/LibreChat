@@ -427,6 +427,100 @@ describe('File Routes - Agent Files Endpoint', () => {
       return testApp;
     };
 
+    /**
+     * Only images are forwarded to the model provider. An upload with no
+     * `tool_resource` takes that path, and a raw document sent down it is refused by
+     * the gateway in front of the model (HTTP 400) — the user gets a failed message
+     * with no explanation. The client hides the option; this is the half that also
+     * holds for a direct API call or a stale tab.
+     */
+    describe('provider path accepts images only', () => {
+      it('refuses a PDF with 415 and never starts processing', async () => {
+        const testApp = createAppWithUser(
+          authorId,
+          SystemRoles.USER,
+          { fileConfig: { imageOnlyProviderUploads: true } },
+          { originalname: 'report.pdf', mimetype: 'application/pdf' },
+        );
+
+        const response = await request(testApp)
+          .post('/files')
+          .send({ endpoint: 'agents', file_id: uuidv4(), message_file: true });
+
+        expect(response.status).toBe(415);
+        expect(response.body.message).toMatch(/only images/i);
+        expect(processAgentFileUpload).not.toHaveBeenCalled();
+      });
+
+      it('refuses a plain text file too — the rule is "not an image", not "is a PDF"', async () => {
+        const testApp = createAppWithUser(
+          authorId,
+          SystemRoles.USER,
+          { fileConfig: { imageOnlyProviderUploads: true } },
+          { originalname: 'notes.txt', mimetype: 'text/plain' },
+        );
+
+        const response = await request(testApp)
+          .post('/files')
+          .send({ endpoint: 'agents', file_id: uuidv4(), message_file: true });
+
+        expect(response.status).toBe(415);
+        expect(processAgentFileUpload).not.toHaveBeenCalled();
+      });
+
+      it('lets an image through', async () => {
+        const testApp = createAppWithUser(
+          authorId,
+          SystemRoles.USER,
+          { fileConfig: { imageOnlyProviderUploads: true } },
+          { originalname: 'cat.png', mimetype: 'image/png' },
+        );
+
+        const response = await request(testApp)
+          .post('/files')
+          .send({ endpoint: 'agents', file_id: uuidv4(), message_file: true });
+
+        expect(response.status).toBe(200);
+        expect(processAgentFileUpload).toHaveBeenCalled();
+      });
+
+      it('with the policy off, a document without a tool resource still passes (upstream default)', async () => {
+        const testApp = createAppWithUser(
+          authorId,
+          SystemRoles.USER,
+          {},
+          { originalname: 'report.pdf', mimetype: 'application/pdf' },
+        );
+
+        const response = await request(testApp)
+          .post('/files')
+          .send({ endpoint: 'agents', file_id: uuidv4(), message_file: true });
+
+        expect(response.status).toBe(200);
+        expect(processAgentFileUpload).toHaveBeenCalled();
+      });
+
+      it('does not touch uploads that name a tool resource', async () => {
+        const testApp = createAppWithUser(
+          authorId,
+          SystemRoles.USER,
+          { fileConfig: { imageOnlyProviderUploads: true } },
+          { originalname: 'report.pdf', mimetype: 'application/pdf' },
+        );
+
+        const response = await request(testApp).post('/files').send({
+          endpoint: 'agents',
+          file_id: uuidv4(),
+          message_file: true,
+          tool_resource: 'context',
+        });
+
+        /** "As text" is exactly where a PDF is supposed to go. */
+        expect(response.status).toBe(200);
+        expect(processAgentFileUpload).toHaveBeenCalled();
+      });
+    });
+
     it('inspects the canonical sanitized filename used by upload processing', async () => {
       const testApp = createAppWithUser(
         authorId,

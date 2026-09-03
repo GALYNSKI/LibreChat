@@ -19,6 +19,7 @@ import {
   Providers,
   EToolResources,
   EModelEndpoint,
+  mergeFileConfig,
   getConfiguredMimeAccept,
   bedrockDocumentMimeTypes,
   defaultAgentCapabilities,
@@ -41,7 +42,7 @@ import {
 import { useSharePointFileHandlingNoChatContext } from '~/hooks/Files/useSharePointFileHandling';
 import { useShortcutAriaKey, useShortcutHint } from '~/hooks/useKeyboardShortcuts';
 import { SharePointPickerDialog } from '~/components/SharePoint';
-import { useGetStartupConfig } from '~/data-provider';
+import { useGetStartupConfig, useGetFileConfig } from '~/data-provider';
 import { ephemeralAgentByConvoId } from '~/store';
 import { MenuItemProps } from '~/common';
 import { cn } from '~/utils';
@@ -121,6 +122,10 @@ const AttachFileMenu = ({
   const { agentsConfig } = useGetAgentsConfig();
   const { data: startupConfig } = useGetStartupConfig();
   const sharePointEnabled = startupConfig?.sharePointFilePickerEnabled;
+  /** Same opt-in policy the drag/paste/modal flows honor via `isProviderAttachType`. */
+  const { data: imageOnlyProviderUploads = false } = useGetFileConfig({
+    select: (data) => mergeFileConfig(data).imageOnlyProviderUploads === true,
+  });
 
   const [isSharePointDialogOpen, setIsSharePointDialogOpen] = useState(false);
 
@@ -205,6 +210,16 @@ const AttachFileMenu = ({
           label: localize('com_ui_upload_provider'),
           onClick: () => {
             setToolResource(undefined);
+            /**
+             * When `imageOnlyProviderUploads` is on, the file is not chosen yet, so the
+             * equivalent of hiding the option for non-images (as drag/paste do via
+             * `isProviderAttachType`) is to scope the picker to images. Otherwise the
+             * menu would hand out a document the server then refuses with 415.
+             */
+            if (imageOnlyProviderUploads) {
+              onAction('image');
+              return;
+            }
             let fileType: Exclude<FileUploadType, 'image' | 'document'> = 'image_document';
             if (currentProvider === Providers.GOOGLE || currentProvider === Providers.OPENROUTER) {
               fileType = 'image_document_video_audio';
@@ -300,6 +315,7 @@ const AttachFileMenu = ({
     handleUploadClick,
     setEphemeralAgent,
     sharePointEnabled,
+    imageOnlyProviderUploads,
     codeAllowedByAgent,
     fileSearchAllowedByAgent,
     setIsSharePointDialogOpen,

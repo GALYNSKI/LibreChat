@@ -521,6 +521,8 @@ const skillFileConfigSchema = z.object({
 
 export const fileConfigSchema = z.object({
   endpoints: z.record(endpointFileConfigSchema).optional(),
+  /** Only images may go to the model provider; other types must use a tool resource. */
+  imageOnlyProviderUploads: z.boolean().optional(),
   skills: skillFileConfigSchema.optional(),
   serverFileSizeLimit: z.number().min(0).optional(),
   avatarSizeLimit: z.number().min(0).optional(),
@@ -1050,6 +1052,10 @@ export function mergeFileConfig(dynamic: z.infer<typeof fileConfigSchema> | unde
     if (textMimeTypes) {
       mergedConfig.text.supportedMimeTypes = convertStringsToRegex(textMimeTypes);
     }
+  }
+
+  if (dynamic.imageOnlyProviderUploads !== undefined) {
+    mergedConfig.imageOnlyProviderUploads = dynamic.imageOnlyProviderUploads;
   }
 
   if (!dynamic.endpoints) {

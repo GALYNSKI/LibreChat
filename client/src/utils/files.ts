@@ -503,7 +503,22 @@ export type UploadOptionContext = {
   endpointSupportedMimeTypes?: RegexLike[];
 };
 
+/**
+ * Opt-in policy (`fileConfig.imageOnlyProviderUploads`): only images may take the
+ * model-provider path; every other type must go to a tool resource instead.
+ *
+ * A document sent down the provider path is forwarded verbatim to the upstream API.
+ * Some gateways in front of the model refuse that — ours answers HTTP 400 for a raw
+ * PDF on both the OpenAI-compatible and the Anthropic path — leaving the user with a
+ * failed message and no explanation. Where every non-image already has a working
+ * destination ("as text", file search, the code environment), offering the provider
+ * path for it only produces a worse outcome. Off by default (upstream behavior);
+ * enforced again on the server (HTTP 415) when on.
+ */
 const isProviderAttachType = (type: string, ctx: UploadOptionContext): boolean => {
+  if (ctx.fileConfig?.imageOnlyProviderUploads === true && !type.startsWith('image/')) {
+    return false;
+  }
   let currentProvider = (ctx.provider || ctx.endpoint) ?? '';
   if (currentProvider.toLowerCase() === Providers.OPENROUTER) {
     currentProvider = Providers.OPENROUTER;
