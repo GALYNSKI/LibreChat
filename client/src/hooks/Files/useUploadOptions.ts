@@ -1,9 +1,10 @@
 import { useCallback } from 'react';
 import { useRecoilValue } from 'recoil';
 import {
-  Tools,
   Constants,
+  Permissions,
   mergeFileConfig,
+  PermissionTypes,
   getEndpointFileConfig,
   defaultAgentCapabilities,
 } from 'librechat-data-provider';
@@ -15,7 +16,7 @@ import { useGetFileConfig } from '~/data-provider';
 import { ephemeralAgentByConvoId } from '~/store';
 import { getViableUploadOptions } from '~/utils';
 import { useDragDropContext } from '~/Providers';
-import { isEphemeralAgent } from '~/common';
+import { useHasAccess } from '~/hooks/Roles';
 
 /**
  * Resolves which upload destinations a file set can be routed to, plus whether uploads are
@@ -29,7 +30,25 @@ export default function useUploadOptions() {
   const ephemeralAgent = useRecoilValue(
     ephemeralAgentByConvoId(conversationId ?? Constants.NEW_CONVO),
   );
-  const { provider, tools } = useAgentToolPermissions(agentId, ephemeralAgent);
+  const {
+    provider,
+    fileSearchAllowedByAgent: fileSearchAllowedBySelection,
+    codeAllowedByAgent: codeAllowedBySelection,
+  } = useAgentToolPermissions(agentId, ephemeralAgent);
+
+  /**
+   * Role permissions, not just capabilities. A role with `FILE_SEARCH.USE: false`
+   * must not be offered the destination at all — otherwise the upload is attempted
+   * and rejected by the server, and the user is told "no" only after choosing.
+   */
+  const fileSearchAllowedByRole = useHasAccess({
+    permissionType: PermissionTypes.FILE_SEARCH,
+    permission: Permissions.USE,
+  });
+  const codeAllowedByRole = useHasAccess({
+    permissionType: PermissionTypes.RUN_CODE,
+    permission: Permissions.USE,
+  });
   const {
     data: fileConfig = null,
     isError: isFileConfigError,
@@ -42,12 +61,16 @@ export default function useUploadOptions() {
   const isConfigPending = !isFileConfigLoaded && !isFileConfigError && !isFileConfigPaused;
 
   /**
-   * Tools are offerable unless a saved agent omits them; in direct/ephemeral chats selecting
-   * one enables the ephemeral capability, matching the original drag-and-drop behavior.
+   * A destination is offerable only when the selection (saved agent's tools, or the
+   * spec's ephemeral toggles) allows it *and* the user's role permits it.
+   *
+   * This used to be recomputed here as `!isSavedAgent || tools?.includes(...)`, which
+   * is `true` for every chat that is not a saved agent — so a model spec that enables
+   * neither tool still offered both. `useAgentToolPermissions` already resolves the
+   * ephemeral/spec case correctly; its result was fetched and then thrown away.
    */
-  const isSavedAgent = agentId != null && agentId !== '' && !isEphemeralAgent(agentId);
-  const fileSearchAllowedByAgent = !isSavedAgent || (tools?.includes(Tools.file_search) ?? false);
-  const codeAllowedByAgent = !isSavedAgent || (tools?.includes(Tools.execute_code) ?? false);
+  const fileSearchAllowedByAgent = fileSearchAllowedBySelection && fileSearchAllowedByRole;
+  const codeAllowedByAgent = codeAllowedBySelection && codeAllowedByRole;
 
   const endpointFileConfig = getEndpointFileConfig({ fileConfig, endpoint, endpointType });
   const uploadsDisabled = endpointFileConfig.disabled === true;
