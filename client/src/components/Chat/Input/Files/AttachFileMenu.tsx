@@ -32,10 +32,10 @@ import type {
 } from 'librechat-data-provider';
 import type { ExtendedFile, FileSetter } from '~/common';
 import {
-  useAgentToolPermissions,
   useAgentCapabilities,
   useGetAgentsConfig,
   useFileHandlingNoChatContext,
+  useUploadDestinationGates,
   useLocalize,
 } from '~/hooks';
 import { useSharePointFileHandlingNoChatContext } from '~/hooks/Files/useSharePointFileHandling';
@@ -130,10 +130,17 @@ const AttachFileMenu = ({
    * */
   const capabilities = useAgentCapabilities(agentsConfig?.capabilities ?? defaultAgentCapabilities);
 
-  const { fileSearchAllowedByAgent, codeAllowedByAgent, provider } = useAgentToolPermissions(
-    agentId,
-    ephemeralAgent,
-  );
+  /**
+   * Same source as the drag, paste and modal flows (`useUploadOptions`), so the menu
+   * cannot offer a destination those would refuse. It used to ask
+   * `useAgentToolPermissions` directly and never consulted the user's role, which left
+   * two different answers to the same question in the codebase.
+   */
+  const {
+    fileSearchAllowed: fileSearchAllowedByAgent,
+    codeAllowed: codeAllowedByAgent,
+    provider,
+  } = useUploadDestinationGates({ agentId, ephemeralAgent });
 
   const handleUploadClick = useCallback(
     (fileType?: FileUploadType) => {

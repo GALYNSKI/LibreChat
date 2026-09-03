@@ -6,7 +6,7 @@ import { EModelEndpoint, EToolResources, Providers } from 'librechat-data-provid
 import AttachFileMenu from '../AttachFileMenu';
 
 jest.mock('~/hooks', () => ({
-  useAgentToolPermissions: jest.fn(),
+  useUploadDestinationGates: jest.fn(),
   useAgentCapabilities: jest.fn(),
   useGetAgentsConfig: jest.fn(),
   useFileHandlingNoChatContext: jest.fn(),
@@ -82,7 +82,7 @@ jest.mock('@ariakit/react', () => {
   };
 });
 
-const mockUseAgentToolPermissions = jest.requireMock('~/hooks').useAgentToolPermissions;
+const mockUseUploadDestinationGates = jest.requireMock('~/hooks').useUploadDestinationGates;
 const mockUseAgentCapabilities = jest.requireMock('~/hooks').useAgentCapabilities;
 const mockUseGetAgentsConfig = jest.requireMock('~/hooks').useGetAgentsConfig;
 const mockUseFileHandlingNoChatContext = jest.requireMock('~/hooks').useFileHandlingNoChatContext;
@@ -124,9 +124,9 @@ function setupMocks(overrides: { provider?: string } = {}) {
   mockUseSharePointFileHandling.mockReturnValue(sharePointReturnValue);
   mockUseSharePointFileHandlingNoChatContext.mockReturnValue(sharePointReturnValue);
   mockUseGetStartupConfig.mockReturnValue({ data: { sharePointFilePickerEnabled: false } });
-  mockUseAgentToolPermissions.mockReturnValue({
-    fileSearchAllowedByAgent: false,
-    codeAllowedByAgent: false,
+  mockUseUploadDestinationGates.mockReturnValue({
+    fileSearchAllowed: false,
+    codeAllowed: false,
     provider: overrides.provider ?? undefined,
   });
 }
@@ -295,9 +295,9 @@ describe('AttachFileMenu', () => {
         fileSearchEnabled: true,
         codeEnabled: false,
       });
-      mockUseAgentToolPermissions.mockReturnValue({
-        fileSearchAllowedByAgent: true,
-        codeAllowedByAgent: false,
+      mockUseUploadDestinationGates.mockReturnValue({
+        fileSearchAllowed: true,
+        codeAllowed: false,
         provider: undefined,
       });
       renderMenu({ endpointType: EModelEndpoint.openAI });
@@ -317,6 +317,58 @@ describe('AttachFileMenu', () => {
       expect(screen.queryByText('Upload for File Search')).not.toBeInTheDocument();
     });
 
+    /**
+     * The menu must not answer "may this chat use file search?" on its own. It used to
+     * ask `useAgentToolPermissions` directly, which knows nothing about role
+     * permissions, while drag/paste/modal asked `useUploadOptions` — two answers to
+     * one question. Both now go through `useUploadDestinationGates`.
+     */
+    it('asks the shared gate hook, with this conversation as the input', () => {
+      setupMocks();
+      renderMenu({ agentId: 'agent_abc', endpointType: EModelEndpoint.openAI });
+
+      expect(mockUseUploadDestinationGates).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: 'agent_abc' }),
+      );
+    });
+
+    it('hides File Search when the shared gate refuses it, capability notwithstanding', () => {
+      setupMocks();
+      mockUseAgentCapabilities.mockReturnValue({
+        contextEnabled: false,
+        fileSearchEnabled: true,
+        codeEnabled: false,
+      });
+      /** What a role with FILE_SEARCH.USE=false produces. */
+      mockUseUploadDestinationGates.mockReturnValue({
+        fileSearchAllowed: false,
+        codeAllowed: false,
+        provider: undefined,
+      });
+      renderMenu({ endpointType: EModelEndpoint.openAI });
+      openMenu();
+
+      expect(screen.queryByText('Upload for File Search')).not.toBeInTheDocument();
+    });
+
+    it('hides the Code Environment when the shared gate refuses it', () => {
+      setupMocks();
+      mockUseAgentCapabilities.mockReturnValue({
+        contextEnabled: false,
+        fileSearchEnabled: false,
+        codeEnabled: true,
+      });
+      mockUseUploadDestinationGates.mockReturnValue({
+        fileSearchAllowed: false,
+        codeAllowed: false,
+        provider: undefined,
+      });
+      renderMenu({ endpointType: EModelEndpoint.openAI });
+      openMenu();
+
+      expect(screen.queryByText('Upload to Code Environment')).not.toBeInTheDocument();
+    });
+
     it('shows Code Files option when enabled and allowed by agent', () => {
       setupMocks();
       mockUseAgentCapabilities.mockReturnValue({
@@ -324,9 +376,9 @@ describe('AttachFileMenu', () => {
         fileSearchEnabled: false,
         codeEnabled: true,
       });
-      mockUseAgentToolPermissions.mockReturnValue({
-        fileSearchAllowedByAgent: false,
-        codeAllowedByAgent: true,
+      mockUseUploadDestinationGates.mockReturnValue({
+        fileSearchAllowed: false,
+        codeAllowed: true,
         provider: undefined,
       });
       renderMenu({ endpointType: EModelEndpoint.openAI });
@@ -341,9 +393,9 @@ describe('AttachFileMenu', () => {
         fileSearchEnabled: true,
         codeEnabled: true,
       });
-      mockUseAgentToolPermissions.mockReturnValue({
-        fileSearchAllowedByAgent: true,
-        codeAllowedByAgent: true,
+      mockUseUploadDestinationGates.mockReturnValue({
+        fileSearchAllowed: true,
+        codeAllowed: true,
         provider: undefined,
       });
       renderMenu({ endpointType: EModelEndpoint.openAI });
@@ -363,9 +415,9 @@ describe('AttachFileMenu', () => {
         fileSearchEnabled: true,
         codeEnabled: false,
       });
-      mockUseAgentToolPermissions.mockReturnValue({
-        fileSearchAllowedByAgent: true,
-        codeAllowedByAgent: false,
+      mockUseUploadDestinationGates.mockReturnValue({
+        fileSearchAllowed: true,
+        codeAllowed: false,
         provider: undefined,
       });
       const originalClick = HTMLInputElement.prototype.click;
