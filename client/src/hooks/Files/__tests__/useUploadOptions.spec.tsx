@@ -26,9 +26,11 @@ jest.mock('~/hooks/Agents/useAgentCapabilities', () => ({
   __esModule: true,
   default: () => ({ fileSearchEnabled: false, codeEnabled: false, contextEnabled: false }),
 }));
-jest.mock('~/hooks/Agents/useAgentToolPermissions', () => ({
+/* The selection/role gate is a single source of truth with its own suite
+ * (`useUploadDestinationGates.spec.tsx`); here only the provider it resolves matters. */
+jest.mock('~/hooks/Files/useUploadDestinationGates', () => ({
   __esModule: true,
-  default: () => ({ provider: mockProvider, tools: [] }),
+  default: () => ({ provider: mockProvider, fileSearchAllowed: true, codeAllowed: true }),
 }));
 jest.mock('~/data-provider', () => ({
   useGetFileConfig: () => ({

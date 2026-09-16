@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { useRecoilValue } from 'recoil';
 import {
-  Tools,
   Constants,
   mergeFileConfig,
   isAgentsEndpoint,
@@ -9,9 +8,9 @@ import {
   defaultAgentCapabilities,
 } from 'librechat-data-provider';
 import type { EToolResources } from 'librechat-data-provider';
-import useAgentToolPermissions from '~/hooks/Agents/useAgentToolPermissions';
 import useAgentCapabilities from '~/hooks/Agents/useAgentCapabilities';
 import { getViableUploadOptions, isUnifiedUploadMode } from '~/utils';
+import useUploadDestinationGates from '~/hooks/Files/useUploadDestinationGates';
 import useGetAgentsConfig from '~/hooks/Agents/useGetAgentsConfig';
 import { useGetFileConfig } from '~/data-provider';
 import { ephemeralAgentByConvoId } from '~/store';
@@ -30,7 +29,15 @@ export default function useUploadOptions() {
   const ephemeralAgent = useRecoilValue(
     ephemeralAgentByConvoId(conversationId ?? Constants.NEW_CONVO),
   );
-  const { provider, tools } = useAgentToolPermissions(agentId, ephemeralAgent);
+  /**
+   * The selection *and* the role decide the destinations, from one source shared with the
+   * attach menu (`useUploadDestinationGates`), so the two flows cannot offer different rules.
+   */
+  const {
+    provider,
+    fileSearchAllowed: fileSearchAllowedByAgent,
+    codeAllowed: codeAllowedByAgent,
+  } = useUploadDestinationGates({ agentId, ephemeralAgent });
   const {
     data: fileConfig = null,
     isError: isFileConfigError,
@@ -42,13 +49,7 @@ export default function useUploadOptions() {
   /** Destination checks read this config, so callers can tell "not viable" from "not known yet". */
   const isConfigPending = !isFileConfigLoaded && !isFileConfigError && !isFileConfigPaused;
 
-  /**
-   * Tools are offerable unless a saved agent omits them; in direct/ephemeral chats selecting
-   * one enables the ephemeral capability, matching the original drag-and-drop behavior.
-   */
   const isSavedAgent = agentId != null && agentId !== '' && !isEphemeralAgent(agentId);
-  const fileSearchAllowedByAgent = !isSavedAgent || (tools?.includes(Tools.file_search) ?? false);
-  const codeAllowedByAgent = !isSavedAgent || (tools?.includes(Tools.execute_code) ?? false);
 
   /* An agent conversation carries endpoint `agents`, but its file policy belongs to the
    * provider it runs on, which is the entry a named custom endpoint configures. Resolved
