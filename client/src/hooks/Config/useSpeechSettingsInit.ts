@@ -75,12 +75,23 @@ export default function useSpeechSettingsInit(isAuthenticated: boolean) {
     const configuredEngineTTS = hasSavedEngineTTS ? engineTTS : data?.engineTTS;
     const sttExternalUnavailable = data?.sttExternal != null && !data.sttExternal;
     const ttsExternalUnavailable = data?.ttsExternal != null && !data.ttsExternal;
+    const sttExternalAvailable = data?.sttExternal != null && !!data.sttExternal;
+    const ttsExternalAvailable = data?.ttsExternal != null && !!data.ttsExternal;
 
+    // When an external provider is configured, force 'external' and override any
+    // saved 'browser'. A deployment with a local speech endpoint must never use
+    // the browser Web Speech API, which streams audio/text to the browser vendor;
+    // this is the single point that keeps every reader (mic input, composer TTS
+    // and the message read-aloud button) on the local endpoint.
     if (sttExternalUnavailable && configuredEngineSTT === STTEndpoints.external) {
       setEngineSTT(STTEndpoints.browser);
+    } else if (sttExternalAvailable && engineSTT !== STTEndpoints.external) {
+      setEngineSTT(STTEndpoints.external);
     }
     if (ttsExternalUnavailable && configuredEngineTTS === TTSEndpoints.external) {
       setEngineTTS(TTSEndpoints.browser);
+    } else if (ttsExternalAvailable && engineTTS !== TTSEndpoints.external) {
+      setEngineTTS(TTSEndpoints.external);
     }
 
     setSpeechSettingsInitialized(true);

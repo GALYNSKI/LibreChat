@@ -103,16 +103,52 @@ describe('useSpeechSettingsInit', () => {
     expect(localStorage.getItem('engineTTS')).toBe(JSON.stringify('browser'));
   });
 
-  it.each(['browser', 'external'])('preserves the valid engine "%s"', async (engine) => {
-    localStorage.setItem('engineSTT', JSON.stringify(engine));
-    localStorage.setItem('engineTTS', JSON.stringify(engine));
+  it('preserves the external engine when an external provider is configured', async () => {
+    localStorage.setItem('engineSTT', JSON.stringify('external'));
+    localStorage.setItem('engineTTS', JSON.stringify('external'));
 
     const { result } = renderHook(() => useSpeechSettingsHarness(), { wrapper });
 
     await waitFor(() => {
       expect(result.current).toEqual({
-        engineSTT: engine,
-        engineTTS: engine,
+        engineSTT: 'external',
+        engineTTS: 'external',
+        speechSettingsInitialized: true,
+      });
+    });
+  });
+
+  it('forces external over a saved browser engine when an external provider is configured', async () => {
+    localStorage.setItem('engineSTT', JSON.stringify('browser'));
+    localStorage.setItem('engineTTS', JSON.stringify('browser'));
+
+    const { result } = renderHook(() => useSpeechSettingsHarness(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current).toEqual({
+        engineSTT: 'external',
+        engineTTS: 'external',
+        speechSettingsInitialized: true,
+      });
+    });
+    expect(localStorage.getItem('engineSTT')).toBe(JSON.stringify('external'));
+    expect(localStorage.getItem('engineTTS')).toBe(JSON.stringify('external'));
+  });
+
+  it('preserves the browser engine when no external provider is configured', async () => {
+    localStorage.setItem('engineSTT', JSON.stringify('browser'));
+    localStorage.setItem('engineTTS', JSON.stringify('browser'));
+    mockUseGetCustomConfigSpeechQuery.mockReturnValue({
+      data: { sttExternal: false, ttsExternal: false },
+      isFetched: true,
+    });
+
+    const { result } = renderHook(() => useSpeechSettingsHarness(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current).toEqual({
+        engineSTT: 'browser',
+        engineTTS: 'browser',
         speechSettingsInitialized: true,
       });
     });
@@ -145,6 +181,12 @@ describe('useSpeechSettingsInit', () => {
   it('normalizes unknown saved engines to browser', async () => {
     localStorage.setItem('engineSTT', JSON.stringify('unknown-stt'));
     localStorage.setItem('engineTTS', JSON.stringify('unknown-tts'));
+    // No external provider, so the unknown values normalize to browser without
+    // the "force external when configured" rule overriding them.
+    mockUseGetCustomConfigSpeechQuery.mockReturnValue({
+      data: { sttExternal: false, ttsExternal: false },
+      isFetched: true,
+    });
 
     const { result } = renderHook(() => useSpeechSettingsHarness(), { wrapper });
 
