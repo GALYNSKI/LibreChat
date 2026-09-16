@@ -13,11 +13,11 @@ const EngineTTSDropdown: React.FC<EngineTTSDropdownProps> = ({ external }) => {
   const [engineTTS, setEngineTTS] = useRecoilState<string>(store.engineTTS);
   const textToSpeech = useRecoilValue(store.textToSpeech);
 
+  // When an external TTS provider is configured, offer only 'external' — the
+  // browser Web Speech API sends text to the browser vendor, so a deployment
+  // that provides a local endpoint must not let users fall back to it.
   const endpointOptions = external
-    ? [
-        { value: 'browser', label: localize('com_nav_browser') },
-        { value: 'external', label: localize('com_nav_external') },
-      ]
+    ? [{ value: 'external', label: localize('com_nav_external') }]
     : [{ value: 'browser', label: localize('com_nav_browser') }];
 
   const handleSelect = (value: string) => {
