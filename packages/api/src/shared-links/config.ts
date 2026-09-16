@@ -94,13 +94,14 @@ export function buildSharedLinkStartupPayload(
     payload.customFooter = env.CUSTOM_FOOTER;
   }
 
-  const { privacyPolicy, termsOfService, codeHighlightThrottleMs } =
+  const { privacyPolicy, termsOfService, codeHighlightThrottleMs, defaultLanguage } =
     appConfig?.interfaceConfig ?? {};
-  if (privacyPolicy || termsOfService || codeHighlightThrottleMs != null) {
+  if (privacyPolicy || termsOfService || codeHighlightThrottleMs != null || defaultLanguage) {
     payload.interface = {
       ...(codeHighlightThrottleMs != null ? { codeHighlightThrottleMs } : {}),
       ...(privacyPolicy ? { privacyPolicy } : {}),
       ...(termsOfService ? { termsOfService } : {}),
+      ...(defaultLanguage ? { defaultLanguage } : {}),
     };
   }
 

@@ -10,6 +10,7 @@ import {
   MAX_PII_PATTERNS_PER_SOURCE,
   MAX_PII_PATTERN_LENGTH,
 } from './filters';
+import { isSupportedLocale } from './locales';
 import {
   EModelEndpoint,
   eModelEndpointSchema,
@@ -2263,6 +2264,13 @@ export const interfaceSchema = z
       .optional(),
     termsOfService: termsOfServiceSchema.optional(),
     customWelcome: z.string().optional(),
+    defaultLanguage: z
+      .string()
+      .refine(isSupportedLocale, {
+        message:
+          'interface.defaultLanguage must be a supported locale or alias (e.g. "de-DE"), or "auto"',
+      })
+      .optional(),
     mcpServers: mcpServersSchema.optional(),
     modelSelect: z.boolean().optional(),
     /** Milliseconds between syntax highlights while a code block streams. */
@@ -2627,7 +2635,7 @@ export type TStartupConfig = {
 
 export type TSharedLinkStartupInterface = Pick<
   Partial<TInterfaceConfig>,
-  'privacyPolicy' | 'termsOfService' | 'codeHighlightThrottleMs'
+  'privacyPolicy' | 'termsOfService' | 'codeHighlightThrottleMs' | 'defaultLanguage'
 >;
 
 export type TSharedLinkStartupConfig = Pick<TStartupConfig, 'appTitle'> &

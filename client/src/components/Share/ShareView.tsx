@@ -1,6 +1,6 @@
-import { memo, useState, useCallback, useContext } from 'react';
+import { memo, useState, useEffect, useCallback, useContext } from 'react';
 import Cookies from 'js-cookie';
-import { useStore } from 'jotai';
+import { useStore, useAtom } from 'jotai';
 import { buildTree } from 'librechat-data-provider';
 import { useRecoilState, useRecoilValue } from 'recoil';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -33,6 +33,7 @@ import { ShareMessagesProvider } from './ShareMessagesProvider';
 import { useForkSharedConvoMutation } from '~/data-provider';
 import { useGetSharedStartupConfig } from '~/data-provider';
 import { ShareArtifactsContainer } from './ShareArtifacts';
+import { toSelectorLocale } from '~/locales/i18n';
 import AppChatSurface from '../Chat/Surface';
 import { ShareContext } from '~/Providers';
 import MessagesView from './MessagesView';
@@ -57,7 +58,25 @@ function SharedView() {
   const dataTree = data && buildTree({ messages: data.messages });
   const messagesTree = dataTree?.length === 0 ? null : (dataTree ?? null);
 
-  const [langcode, setLangcode] = useRecoilState(store.lang);
+  const [langcode, setLangcode] = useAtom(store.lang);
+
+  /**
+   * Apply `interface.defaultLanguage` from the shared-link startup config for
+   * viewers who have not chosen a language themselves. The public share view has
+   * no LanguageSync, so it needs the same effect. 'auto' is skipped and the value
+   * is mapped to the selector-conform form (see LanguageSync).
+   */
+  const sharedDefaultLanguage = config?.interface?.defaultLanguage;
+  useEffect(() => {
+    if (!sharedDefaultLanguage || sharedDefaultLanguage === 'auto') {
+      return;
+    }
+    const userChoseLanguage = !!Cookies.get('lang') || localStorage.getItem('lang') !== null;
+    if (userChoseLanguage) {
+      return;
+    }
+    setLangcode(toSelectorLocale(sharedDefaultLanguage));
+  }, [sharedDefaultLanguage, setLangcode]);
 
   const forkShare = useForkSharedConvoMutation({
     onSuccess: (forkData) => {
